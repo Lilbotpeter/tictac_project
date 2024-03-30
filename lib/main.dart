@@ -19,9 +19,8 @@ class TicTacToeApp extends StatelessWidget {
   }
 }
 
-class TicTacToeGame extends StatefulWidget {
+class TicTacToeGame extends StatefulWidget { 
   final int size; 
-
   TicTacToeGame({required this.size});
 
   @override
@@ -31,12 +30,42 @@ class TicTacToeGame extends StatefulWidget {
 class _TicTacToeGameState extends State<TicTacToeGame> {
   late TicTacToeBoard board;
   late bool playerTurn;
+  DatabaseHelper databaseHelper = DatabaseHelper();
+  late List<Map<String, dynamic>> dataList = [];
+  late String result = "";
+  
+  
+
+
 
   @override
   void initState() {
     super.initState();
     resetGame();
+    initDatabase();
+    fetchDataFromDatabase();
+
   }
+
+  Future<void> initDatabase() async {
+  await databaseHelper.initDB();
+}
+
+Future<void> fetchDataFromDatabase() async {
+  Database db = await databaseHelper.initDB();
+  List<Map<String, dynamic>> data = await db.query('History', orderBy: 'id DESC');
+  print(data);
+  setState(() {
+    dataList = data;
+  });
+}
+
+
+
+  // Future<void> checkDatabase() async{
+  //   bool isOpen = await DatabaseHelper().isDatabaseOpen();
+  //   print('Database is open : $isOpen');
+  // }
 
 void resetGame() {
   setState(() {
@@ -50,6 +79,7 @@ void resetGame() {
 }
 
   void AIMove() {
+    result = "Player O Win";
     List<int> bestMove = board.minimax('O');
     if (bestMove[1] != -1 && bestMove[2] != -1) {
       setState(() {
@@ -59,14 +89,16 @@ void resetGame() {
           showDialog(
             context: context,
             builder: (context) => AlertDialog(
-              title: Text('Player O Wins!'),
+              title: Text(result),
               actions: [
                 TextButton(
-                  onPressed: () {
+                  onPressed: () async{
+                    await databaseHelper.insertData("Player O Win");
+                    fetchDataFromDatabase();
                     Navigator.of(context).pop();
                     resetGame();
                   },
-                  child: Text('Play Again'),
+                  child: Text('Play Again & Save'),
                 ),
               ],
             ),
@@ -77,6 +109,7 @@ void resetGame() {
   }
 
   void playerMove(int row, int col) {
+    result = "Player X Win";
     if (board.board[row][col] == '' && playerTurn) {
       setState(() {
         board.board[row][col] = 'X';
@@ -86,28 +119,34 @@ void resetGame() {
           showDialog(
             context: context,
             builder: (context) => AlertDialog(
-              title: Text('Player X Wins!'),
+              title: Text(result),
               actions: [
-                TextButton(
-                  onPressed: () {
+                TextButton (
+                  onPressed: () async{
+                    await databaseHelper.insertData(result);
                     Navigator.of(context).pop();
+                    fetchDataFromDatabase();
                     resetGame();
                   },
-                  child: Text('Play Again'),
+                  child: Text('Play Again & Save'),
                 ),
               ],
             ),
           );
        } else if (board.isBoardFull()) {
-  //showPlayHistory(); 
+        result = "It\'s a Tie!";
   showDialog(
     context: context,
     builder: (context) => AlertDialog(
-      title: Text('It\'s a Tie!'),
+      title: Text(result),
       actions: [
         ElevatedButton(
-          onPressed: (){Navigator.of(context).pop();
-          resetGame();},
+          onPressed: () async{
+            Navigator.of(context).pop();
+          resetGame();
+          await databaseHelper.insertData(result);
+          },
+          
           child: Text('Reset Game'),
         ),
       ],
@@ -118,44 +157,6 @@ void resetGame() {
 }
       });
     }
-  }
-
-  
-
-  Future<void> savePlayHistory(String result) async {
-    await DatabaseHelper.instance.insertPlayHistory(
-      playerTurn ? 'X' : 'O',
-      result,
-    );
-  }
-
-  Future<void> showPlayHistory() async {
-    List<Map<String, dynamic>> playHistory =
-        await DatabaseHelper.instance.queryAllPlayHistory();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Play History'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: playHistory.map((historyItem) {
-            return ListTile(
-              title: Text('Player: ${historyItem['player']}'),
-              subtitle: Text('Result: ${historyItem['result']}'),
-            );
-          }).toList(),
-        ),
-        actions: [
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
-            child: Text('Close'),
-          ),
-        ],
-      ),
-    );
   }
 
   @override
@@ -197,32 +198,29 @@ void resetGame() {
         },
       ),
       
-      
-            IconButton(
-              onPressed: resetGame,
-              icon: Icon(Icons.restart_alt_outlined,size: 30,),
-            ),
-            // ElevatedButton(
-            //   onPressed: () {
-            //     savePlayHistory('Saved');
-            //   },
-            //   child: Text('Save Play History'),
-            // ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 120,vertical: 15 ),
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  primary: Colors.orange
-                ),
-                onPressed: () {
-                  showPlayHistory();
-                },
-                child: Text('Show History'),
-              ),
-            ),
+  
+      Padding(padding: const EdgeInsets.only(right:300,top: 20,bottom: 10),
+        child: Text("History",
+          style: TextStyle(fontWeight: FontWeight.bold,
+            fontSize: 20),
+        ),
+      ),
+
+         Expanded(
+  child: ListView.builder(
+    itemCount: dataList.length,
+    itemBuilder: (context, index) {
+      return ListTile(
+        title: Text('Result'),
+        subtitle: Text('${dataList[index]['winner']}'),
+      );
+    },
+  ),
+)
           ],
         ),
       ),
+      
     );
   }
 }
