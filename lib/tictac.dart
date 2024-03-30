@@ -14,6 +14,7 @@ class TicTacToeBoard {
     }
     return true;
   }
+  
   //win check
   bool checkWin(String player) {
     for (int i = 0; i < size; i++) {
